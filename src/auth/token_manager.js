@@ -66,21 +66,9 @@ class TokenManager {
       this.ensureDataFile();
 
       const data = fs.readFileSync(this.filePath, 'utf8');
-      let tokenArray = JSON.parse(data || '[]');
-      let needSave = false;
-      
-      tokenArray = tokenArray.map(token => {
-        if (!token.projectId) {
-          token.projectId = generateProjectId();
-          needSave = true;
-        }
-        return token;
-      });
-      
-      if (needSave) {
-        fs.writeFileSync(this.filePath, JSON.stringify(tokenArray, null, 2), 'utf8');
-      }
-      
+      const parsed = JSON.parse(data || '[]');
+      const tokenArray = Array.isArray(parsed) ? parsed : [];
+
       this.tokens = tokenArray.filter(token => token.enable !== false).map(token => ({
         ...token,
         sessionId: generateSessionId()

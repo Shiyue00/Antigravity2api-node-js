@@ -4,6 +4,7 @@ import config from '../config/config.js';
 import { generateRequestId, generateToolCallId } from '../utils/idGenerator.js';
 import AntigravityRequester from '../AntigravityRequester.js';
 import { saveBase64Image } from '../utils/imageStorage.js';
+import { registerThoughtSignature } from '../utils/utils.js';
 
 // 请求客户端：优先使用 AntigravityRequester，失败则降级到 axios
 let requester = null;
@@ -256,6 +257,16 @@ function convertToToolCall(functionCall) {
             arguments: JSON.stringify(functionCall.args)
         }
     };
+  }
+  
+  
+// 辅助函数：在保留原有结构的同时记录 thoughtSignature
+function convertToToolCallWithSignature(functionCall, thoughtSignature) {
+    const toolCall = convertToToolCall(functionCall);
+    if (thoughtSignature && toolCall && toolCall.id) {
+        registerThoughtSignature(toolCall.id, thoughtSignature);
+    }
+    return toolCall;
 }
 
 // 解析并发送流式响应片段（会修改 state 并触发 callback）

@@ -9,6 +9,7 @@ const logsRefreshBtn = document.getElementById('logsRefreshBtn');
 const hourlyUsageEl = document.getElementById('hourlyUsage');
 const manageStatusEl = document.getElementById('manageStatus');
 const callbackUrlInput = document.getElementById('callbackUrlInput');
+const allowRandomProjectIdCheckbox = document.getElementById('allowRandomProjectId');
 const submitCallbackBtn = document.getElementById('submitCallbackBtn');
 const logsEl = document.getElementById('logs');
 const usageStatusEl = document.getElementById('usageStatus');
@@ -380,7 +381,14 @@ function renderSettings(groups) {
     .map(group => {
       const items = (group.items || [])
         .map(item => {
-          const value = item?.value ?? '未设置';
+          const currentValue = item?.value ?? '未设置';
+          const defaultValue = item?.defaultValue ?? '无默认值';
+
+          // 显示格式：如果设置了环境变量，显示"环境变量值 (默认值: 默认值)"
+          const displayValue = item.isDefault
+            ? (item.defaultValue !== null && item.defaultValue !== undefined ? defaultValue : currentValue)
+            : `${currentValue} ${defaultValue !== '无默认值' ? `(默认值: ${defaultValue})` : ''}`;
+
           const badges = [
             `<span class="chip ${item.isDefault ? '' : 'chip-success'}">${item.isDefault ? '默认值' : '环境变量'}</span>`,
             item.sensitive ? '<span class="chip chip-warning">敏感信息</span>' : ''
@@ -390,9 +398,7 @@ function renderSettings(groups) {
 
           const metaParts = [
             item.isDefault ? '使用默认值' : '来自环境变量',
-            item.defaultValue !== null && item.defaultValue !== undefined
-              ? `默认：${escapeHtml(item.defaultValue)}`
-              : '无默认值',
+            `环境变量名: ${item.key}`,
             item.description ? escapeHtml(item.description) : ''
           ]
             .filter(Boolean)
@@ -404,7 +410,7 @@ function renderSettings(groups) {
                 <div class="setting-key">${escapeHtml(item.label || item.key)}</div>
                 ${badges}
               </div>
-              <div class="setting-value">${escapeHtml(value)}</div>
+              <div class="setting-value">${escapeHtml(displayValue)}</div>
               <div class="setting-meta">${metaParts}</div>
             </div>
           `;
@@ -792,7 +798,7 @@ if (submitCallbackBtn && callbackUrlInput) {
       await fetchJson('/auth/oauth/parse-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, replaceIndex })
+        body: JSON.stringify({ url, replaceIndex, allowRandomProjectId: !!allowRandomProjectIdCheckbox?.checked })
       });
 
       setStatus('授权成功，账号已添加。', 'success');
