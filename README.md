@@ -65,3 +65,10 @@ QQ群：`937931004`
 2. 凭证报错403
 
 > 1. 尝试自动获取项目ID或者手动输入项目ID或者使用随机项目ID
+
+3. 给G-3-P-I设置分辨率 ？
+
+> 试一试一下模型ID
+> gemini-3-pro-image-1k
+> gemini-3-pro-image-2k
+> gemini-3-pro-image-4k
