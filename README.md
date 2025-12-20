@@ -4,6 +4,16 @@
 
 当前项目是基于[liuw1535](https://github.com/liuw1535) 大佬的 [antigravity2api-nodejs](https://github.com/liuw1535/antigravity2api-nodejs) 做的修改和迭代
 
+## 赞助商
+
+[![bigmodel.cn](https://assets.router-for.me/chinese.png)](https://www.bigmodel.cn/claude-code?ic=J2QPQGUXXQ)
+
+本项目由 Z智谱 提供赞助, 他们通过 GLM CODING PLAN 对本项目提供技术支持。
+
+GLM CODING PLAN 是专为AI编码打造的订阅套餐，每月最低仅需20元，即可在十余款主流AI编码工具如 Claude Code、Cline、Roo Code 中畅享智谱旗舰模型GLM-4.6，为开发者提供顶尖的编码体验。
+
+智谱AI为本软件提供了特别优惠，使用以下链接购买可以享受九折优惠：https://www.bigmodel.cn/claude-code?ic=J2QPQGUXXQ
+
 ## 免责声明
 
 仅供个人学习，出事与项目负责人无关
