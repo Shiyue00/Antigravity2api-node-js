@@ -150,6 +150,9 @@ function statusFromStatusText(statusText) {
     return Number.isNaN(numeric) ? null : numeric;
 }
 
+// 最大重试延迟时间（毫秒）
+const MAX_RETRY_DELAY_MS = 3000;
+
 function parseRetryDelayMs(errorInfo, message) {
     let retryDelayMs = null;
 
@@ -169,6 +172,11 @@ function parseRetryDelayMs(errorInfo, message) {
         if (messageMatch) {
             retryDelayMs = Math.ceil(parseFloat(messageMatch[1]) * 1000);
         }
+    }
+
+    // 限制重试延迟最多为 MAX_RETRY_DELAY_MS（3秒）
+    if (retryDelayMs !== null && retryDelayMs > MAX_RETRY_DELAY_MS) {
+        retryDelayMs = MAX_RETRY_DELAY_MS;
     }
 
     return retryDelayMs;
