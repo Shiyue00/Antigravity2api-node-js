@@ -316,7 +316,9 @@ async function withRetry(operationFactory, initialToken) {
             }
 
             // 其他可重试错误或429首次重试：等待后重试
-            const delayMs = details.retryDelayMs ?? Math.min(1000 * tokenAttempts, 5000);
+            // 限制最大重试延迟为3秒，防止API返回超长重试时间
+            const maxRetryDelayMs = 3000;
+            const delayMs = Math.min(details.retryDelayMs ?? (1000 * tokenAttempts), maxRetryDelayMs);
             log.info(`[withRetry] ${details.status}错误，等待${delayMs}ms后重试 (当前token第${tokenAttempts + 1}次尝试)`);
             await delay(delayMs);
         }
