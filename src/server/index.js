@@ -1565,6 +1565,14 @@ app.use('/admin', (req, res, next) => {
 
 // ===== API routes =====
 
+// 需要使用轮询方式选择token的图像模型列表
+const IMAGE_ROUND_ROBIN_MODELS = [
+  'gemini-3-pro-image',
+  'gemini-3-pro-image-1k',
+  'gemini-3-pro-image-2k',
+  'gemini-3-pro-image-4k'
+];
+
 const createChatCompletionHandler = (resolveToken, options = {}) => async (req, res) => {
   const { messages, model, stream = true, tools, ...params } = req.body || {};
   const startedAt = Date.now();
@@ -2270,7 +2278,13 @@ app.post('/v1/images/generations', async (req, res) => {
   }
 });
 
-app.post('/v1/chat/completions', createChatCompletionHandler(() => tokenManager.getToken()));
+app.post('/v1/chat/completions', createChatCompletionHandler((req) => {
+  const model = req.body?.model || '';
+  if (IMAGE_ROUND_ROBIN_MODELS.includes(model)) {
+    return tokenManager.getTokenRoundRobin();
+  }
+  return tokenManager.getToken();
+}));
 app.post(
   '/:credential/v1/chat/completions',
   createChatCompletionHandler(
