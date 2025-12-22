@@ -150,6 +150,9 @@ function statusFromStatusText(statusText) {
     return Number.isNaN(numeric) ? null : numeric;
 }
 
+// 最大重试延迟时间（毫秒）
+const MAX_RETRY_DELAY_MS = 3000;
+
 function parseRetryDelayMs(errorInfo, message) {
     let retryDelayMs = null;
 
@@ -169,6 +172,11 @@ function parseRetryDelayMs(errorInfo, message) {
         if (messageMatch) {
             retryDelayMs = Math.ceil(parseFloat(messageMatch[1]) * 1000);
         }
+    }
+
+    // 限制重试延迟最多为 MAX_RETRY_DELAY_MS（3秒）
+    if (retryDelayMs !== null && retryDelayMs > MAX_RETRY_DELAY_MS) {
+        retryDelayMs = MAX_RETRY_DELAY_MS;
     }
 
     return retryDelayMs;
@@ -316,9 +324,7 @@ async function withRetry(operationFactory, initialToken) {
             }
 
             // 其他可重试错误或429首次重试：等待后重试
-            // 限制最大重试延迟为3秒，防止API返回超长重试时间
-            const maxRetryDelayMs = 3000;
-            const delayMs = Math.min(details.retryDelayMs ?? (1000 * tokenAttempts), maxRetryDelayMs);
+            const delayMs = details.retryDelayMs ?? Math.min(1000 * tokenAttempts, 5000);
             log.info(`[withRetry] ${details.status}错误，等待${delayMs}ms后重试 (当前token第${tokenAttempts + 1}次尝试)`);
             await delay(delayMs);
         }
