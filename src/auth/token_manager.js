@@ -14,10 +14,11 @@ const CLIENT_ID = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleuse
 const CLIENT_SECRET = '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';
 
 class TokenManager {
-  constructor(filePath = path.join(__dirname,'..','..','data' ,'accounts.json')) {
+  constructor(filePath = path.join(__dirname, '..', '..', 'data', 'accounts.json')) {
     this.filePath = filePath;
     this.tokens = [];
     this.currentIndex = 0;
+    this.roundRobinIndex = 0; // 用于图像模型的轮询索引
     this.hourlyLimit = Number.isFinite(Number(config.credentials?.maxUsagePerHour))
       ? Number(config.credentials.maxUsagePerHour)
       : 20;
@@ -163,7 +164,7 @@ class TokenManager {
           allTokens[index] = tokenToSave;
         }
       });
-      
+
       fs.writeFileSync(this.filePath, JSON.stringify(allTokens, null, 2), 'utf8');
     } catch (error) {
       log.error('保存文件失败:', error.message);
@@ -271,6 +272,71 @@ class TokenManager {
     if (found) {
       this.disableToken(found);
     }
+  }
+
+  /**
+   * 轮询方式获取token，专用于图像模型
+   * 每次调用自动移动到下一个token，不受每小时用量限制
+   */
+  async getTokenRoundRobin() {
+    if (this.tokens.length === 0) return null;
+
+    let attempts = 0;
+    const totalTokens = this.tokens.length;
+
+    while (attempts < totalTokens) {
+      // 先移动索引再获取token，确保每次调用都切换
+      this.roundRobinIndex = (this.roundRobinIndex + 1) % totalTokens;
+      const token = this.tokens[this.roundRobinIndex];
+
+      try {
+        if (this.isExpired(token)) {
+          await this.refreshToken(token);
+        }
+
+        if (!token.projectId) {
+          if (config.skipProjectIdFetch) {
+            token.projectId = generateProjectId();
+            this.saveToFile();
+            log.info(`...${token.access_token.slice(-8)}: 使用随机生成的projectId: ${token.projectId}`);
+          } else {
+            try {
+              const projectId = await this.fetchProjectId(token);
+              if (projectId === undefined) {
+                log.warn(`...${token.access_token.slice(-8)}: 无资格获取projectId，跳过`);
+                this.disableToken(token);
+                if (this.tokens.length === 0) return null;
+                attempts += 1;
+                continue;
+              }
+              token.projectId = projectId;
+              this.saveToFile();
+            } catch (error) {
+              log.error(`...${token.access_token.slice(-8)}: 获取projectId失败:`, error.message);
+              attempts += 1;
+              continue;
+            }
+          }
+        }
+
+        // 轮询模式不检查每小时用量限制
+        log.info(`[RoundRobin] 选中token: ${token.projectId || '未知'}`);
+        return token;
+      } catch (error) {
+        if (error.statusCode === 403 || error.statusCode === 400) {
+          const accountNum = this.roundRobinIndex + 1;
+          log.warn(`账号 ${accountNum}: Token 已失效或错误，已自动禁用该账号`);
+          this.disableToken(token);
+          if (this.tokens.length === 0) return null;
+        } else {
+          log.error(`Token ${this.roundRobinIndex + 1} 刷新失败:`, error.message);
+        }
+      }
+
+      attempts += 1;
+    }
+
+    return null;
   }
 }
 const tokenManager = new TokenManager();
