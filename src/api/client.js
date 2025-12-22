@@ -261,7 +261,7 @@ async function withRetry(operationFactory, initialToken) {
     const retryStatusCodes = config.retry?.statusCodes?.length
         ? config.retry.statusCodes
         : [429, 500];
-    const maxAttemptsPerToken = 2; // 每个token最多尝试2次（首次 + 1次重试）
+    const maxAttemptsPerToken = 2; // 每个token最多尝试2次（首次 + 1次重试），仅用于非429错误
 
     let currentToken = initialToken;
     let tokenAttempts = 0; // 当前token的尝试次数
@@ -298,9 +298,9 @@ async function withRetry(operationFactory, initialToken) {
 
             tokenAttempts += 1;
 
-            // 429错误：当前token已重试1次后，切换到下一个token
-            if (is429 && tokenAttempts >= maxAttemptsPerToken) {
-                log.info(`[withRetry] 429错误，当前token已重试${tokenAttempts}次，尝试切换到下一个token...`);
+            // 429错误：直接切换到下一个token，不在当前token上重试
+            if (is429) {
+                log.info(`[withRetry] 429错误，直接切换到下一个token（不在当前token上重试）...`);
                 tokenManager.moveToNextToken();
                 const nextToken = await tokenManager.getToken();
 
@@ -323,7 +323,31 @@ async function withRetry(operationFactory, initialToken) {
                 continue;
             }
 
-            // 其他可重试错误或429首次重试：等待后重试
+            // 非429的其他可重试错误：在当前token上重试
+            if (tokenAttempts >= maxAttemptsPerToken) {
+                log.info(`[withRetry] 非429错误，当前token已重试${tokenAttempts}次，尝试切换到下一个token...`);
+                tokenManager.moveToNextToken();
+                const nextToken = await tokenManager.getToken();
+
+                if (!nextToken) {
+                    log.warn('[withRetry] 没有可用的token了');
+                    throw error;
+                }
+
+                if (triedTokenIds.has(nextToken.access_token)) {
+                    log.warn('[withRetry] 所有token都已尝试过，仍然失败');
+                    throw error;
+                }
+
+                triedTokenIds.add(nextToken.access_token);
+                currentToken = nextToken;
+                tokenAttempts = 0;
+                tokenSwitches += 1;
+                log.info(`[withRetry] 已切换到新token (第${tokenSwitches}次切换)`);
+                continue;
+            }
+
+            // 非429错误且未达到最大重试次数：等待后在当前token上重试
             const delayMs = details.retryDelayMs ?? Math.min(1000 * tokenAttempts, 5000);
             log.info(`[withRetry] ${details.status}错误，等待${delayMs}ms后重试 (当前token第${tokenAttempts + 1}次尝试)`);
             await delay(delayMs);
