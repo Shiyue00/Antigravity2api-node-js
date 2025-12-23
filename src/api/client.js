@@ -260,8 +260,8 @@ async function withRetry(operationFactory, initialToken) {
     const maxTokenSwitches = Math.max(config.retry?.maxAttempts || 3, 1);
     const retryStatusCodes = config.retry?.statusCodes?.length
         ? config.retry.statusCodes
-        : [429, 500];
-    const maxAttemptsPerToken = 2; // 每个token最多尝试2次（首次 + 1次重试），仅用于非429错误
+        : [500]; // 429错误不再重试，直接返回错误
+    const maxAttemptsPerToken = 2; // 每个token最多尝试2次（首次 + 1次重试）
 
     let currentToken = initialToken;
     let tokenAttempts = 0; // 当前token的尝试次数
@@ -286,10 +286,9 @@ async function withRetry(operationFactory, initialToken) {
                 throw error;
             }
 
-            const is429 = details.status === 429;
             const shouldRetry = retryStatusCodes.includes(details.status);
 
-            log.info(`[withRetry] is429=${is429}, shouldRetry=${shouldRetry}`);
+            log.info(`[withRetry] shouldRetry=${shouldRetry}`);
 
             if (!shouldRetry) {
                 log.warn(`[withRetry] 状态码 ${details.status} 不在重试列表中，直接抛出错误`);
@@ -297,31 +296,6 @@ async function withRetry(operationFactory, initialToken) {
             }
 
             tokenAttempts += 1;
-
-            // 429错误：直接切换到下一个token，不在当前token上重试
-            if (is429) {
-                log.info(`[withRetry] 429错误，直接切换到下一个token（不在当前token上重试）...`);
-                tokenManager.moveToNextToken();
-                const nextToken = await tokenManager.getToken();
-
-                if (!nextToken) {
-                    log.warn('[withRetry] 没有可用的token了');
-                    throw error;
-                }
-
-                // 检查是否已经尝试过这个token（避免循环）
-                if (triedTokenIds.has(nextToken.access_token)) {
-                    log.warn('[withRetry] 所有token都已尝试过，仍然失败');
-                    throw error;
-                }
-
-                triedTokenIds.add(nextToken.access_token);
-                currentToken = nextToken;
-                tokenAttempts = 0;
-                tokenSwitches += 1;
-                log.info(`[withRetry] 已切换到新token (第${tokenSwitches}次切换)`);
-                continue;
-            }
 
             // 非429的其他可重试错误：在当前token上重试
             if (tokenAttempts >= maxAttemptsPerToken) {
