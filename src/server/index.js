@@ -340,7 +340,7 @@ const SETTINGS_DEFINITIONS = [
     key: 'RETRY_STATUS_CODES',
     label: '重试状态码',
     category: '限额与重试',
-    defaultValue: '429,500',
+    defaultValue: '500',
     valueResolver: cfg => cfg.retry.statusCodes
   },
   {
