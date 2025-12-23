@@ -257,79 +257,24 @@ function delay(ms) {
 }
 
 async function withRetry(operationFactory, initialToken) {
-    const maxTokenSwitches = Math.max(config.retry?.maxAttempts || 3, 1);
-    const retryStatusCodes = config.retry?.statusCodes?.length
-        ? config.retry.statusCodes
-        : [500]; // 429错误不再重试，直接返回错误
-    const maxAttemptsPerToken = 2; // 每个token最多尝试2次（首次 + 1次重试）
+    // 简化逻辑：不做任何重试，遇到错误直接返回
+    // 429和其他错误都会直接抛出，不再切换token重试
+    log.info('[withRetry] 开始请求（无重试模式）');
 
-    let currentToken = initialToken;
-    let tokenAttempts = 0; // 当前token的尝试次数
-    let tokenSwitches = 0; // 已切换token的次数
-    const triedTokenIds = new Set([currentToken.access_token]);
-    let lastError = null;
+    try {
+        return await operationFactory(initialToken);
+    } catch (error) {
+        const details = await extractErrorDetails(error);
 
-    log.info(`[withRetry] 开始请求，maxTokenSwitches=${maxTokenSwitches}, retryStatusCodes=${retryStatusCodes.join(',')}`);
+        log.warn(`[withRetry] 请求失败，status=${details.status}，直接返回错误`);
 
-    while (tokenSwitches < maxTokenSwitches) {
-        try {
-            return await operationFactory(currentToken);
-        } catch (error) {
-            lastError = error;
-            const details = await extractErrorDetails(error);
-
-            log.warn(`[withRetry] 请求失败，status=${details.status}, tokenAttempts=${tokenAttempts}, tokenSwitches=${tokenSwitches}`);
-
-            if (details.disableToken || details.status === 401) {
-                log.warn(`[withRetry] Token需要禁用 (status=${details.status}, disableToken=${details.disableToken})`);
-                tokenManager.disableCurrentToken(currentToken);
-                throw error;
-            }
-
-            const shouldRetry = retryStatusCodes.includes(details.status);
-
-            log.info(`[withRetry] shouldRetry=${shouldRetry}`);
-
-            if (!shouldRetry) {
-                log.warn(`[withRetry] 状态码 ${details.status} 不在重试列表中，直接抛出错误`);
-                throw error;
-            }
-
-            tokenAttempts += 1;
-
-            // 非429的其他可重试错误：在当前token上重试
-            if (tokenAttempts >= maxAttemptsPerToken) {
-                log.info(`[withRetry] 非429错误，当前token已重试${tokenAttempts}次，尝试切换到下一个token...`);
-                tokenManager.moveToNextToken();
-                const nextToken = await tokenManager.getToken();
-
-                if (!nextToken) {
-                    log.warn('[withRetry] 没有可用的token了');
-                    throw error;
-                }
-
-                if (triedTokenIds.has(nextToken.access_token)) {
-                    log.warn('[withRetry] 所有token都已尝试过，仍然失败');
-                    throw error;
-                }
-
-                triedTokenIds.add(nextToken.access_token);
-                currentToken = nextToken;
-                tokenAttempts = 0;
-                tokenSwitches += 1;
-                log.info(`[withRetry] 已切换到新token (第${tokenSwitches}次切换)`);
-                continue;
-            }
-
-            // 非429错误且未达到最大重试次数：等待后在当前token上重试
-            const delayMs = details.retryDelayMs ?? Math.min(1000 * tokenAttempts, 5000);
-            log.info(`[withRetry] ${details.status}错误，等待${delayMs}ms后重试 (当前token第${tokenAttempts + 1}次尝试)`);
-            await delay(delayMs);
+        if (details.disableToken || details.status === 401) {
+            log.warn(`[withRetry] Token需要禁用 (status=${details.status}, disableToken=${details.disableToken})`);
+            tokenManager.disableCurrentToken(initialToken);
         }
-    }
 
-    log.error('[withRetry] 所有token都已尝试，仍然失败');
-    throw lastError || new Error('所有token都已尝试，仍然失败');
+        throw error;
+    }
 }
 
 // 统一错误处理
