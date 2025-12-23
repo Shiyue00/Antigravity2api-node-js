@@ -38,7 +38,7 @@ TIMEOUT=1800000
 MAX_IMAGES=10 # 最大保存的图片数量，超过就会删除时间最早的
 # IMAGE_BASE_URL=http://your-domain.com  # 可选：自定义图片访问基础 URL，默认使用宿主机 IP 或本地回环
 CREDENTIAL_MAX_USAGE_PER_HOUR=20
-RETRY_STATUS_CODES=429,500
+RETRY_STATUS_CODES=500
 RETRY_MAX_ATTEMPTS=3
 
 SYSTEM_INSTRUCTION=
@@ -79,7 +79,7 @@ function ensureEnvFile() {
 function loadConfigFromEnv() {
   // getEffectiveDataConfig 已经把 DOCKER_ONLY_KEYS 从环境变量注入进来了
   const flat = getEffectiveDataConfig();
-  
+
   // 调试日志：检查 flat 中的 IMAGE_BASE_URL 值
   log.info(`[DEBUG config] flat.IMAGE_BASE_URL = "${flat.IMAGE_BASE_URL}"`);
 
@@ -123,7 +123,7 @@ function loadConfigFromEnv() {
         parseInt(flat.CREDENTIAL_MAX_USAGE_PER_HOUR, 10) || 20
     },
     retry: {
-      statusCodes: (flat.RETRY_STATUS_CODES || '429,500')
+      statusCodes: (flat.RETRY_STATUS_CODES || '500')
         .split(',')
         .map(code => parseInt(String(code).trim(), 10))
         .filter(code => !Number.isNaN(code)),
